@@ -134,23 +134,23 @@ const pineconeQuery = async (req, res) => {
   );
 
   /* Search the vector DB independently with meta filters */
-  const results = await vectorStore.similaritySearch('pinecone', 2, {
-    brand: 'nike',
-  });
-  console.log(results);
+  // const results = await vectorStore.similaritySearch('pinecone', 2, {
+  //   brand: 'nike',
+  // });
+  // console.log(results);
 
   /* Use as part of a chain (currently no metadata filters) */
   const model = new OpenAI();
   const chain = VectorDBQAChain.fromLLM(model, vectorStore, {
-    k: 1,
+    k: 2,
     returnSourceDocuments: true,
   });
   const response = await chain.call({
-    query:
-      'I want a adidas shoes which is MADE IN PART WITH RECYCLED MATERIALS',
+    query: req.body.input,
+    // 'I want a adidas shoes which is MADE IN PART WITH RECYCLED MATERIALS',
   });
   res.successResponse(StatusCodes.OK, {
-    data: results,
+    data: response,
   });
   /*
   {
