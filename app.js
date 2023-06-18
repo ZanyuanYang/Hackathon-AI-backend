@@ -7,7 +7,6 @@ import NotFoundError from './errors/not-found-error.js';
 import errorHandler from './middlewares/error-handler.js';
 import ResponseMiddleware from './middlewares/ResponseMiddleware.js';
 import LoggerMiddleware from './middlewares/LoggerMiddleware.js';
-// import testVector from './utils/textToVectors.js';
 
 import { productRouter } from './routes/productRouter.js';
 

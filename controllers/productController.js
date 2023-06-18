@@ -6,13 +6,17 @@ import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
 import { PineconeStore } from 'langchain/vectorstores/pinecone';
 import { VectorDBQAChain } from 'langchain/chains';
 import { OpenAI } from 'langchain/llms/openai';
-import { SystemMessagePromptTemplate } from 'langchain/prompts';
-import { HumanChatMessage, SystemChatMessage } from 'langchain/schema';
-import readline from 'readline';
 import fs from 'fs';
 import csv from 'csv-parser';
 import { BufferMemory } from 'langchain/memory';
-import { MemoryVectorStore } from 'langchain/vectorstores/memory';
+import { ConversationChain } from 'langchain/chains';
+import { ChatOpenAI } from 'langchain/chat_models/openai';
+import {
+  ChatPromptTemplate,
+  HumanMessagePromptTemplate,
+  SystemMessagePromptTemplate,
+  MessagesPlaceholder,
+} from 'langchain/prompts';
 
 // get one by id
 const getOne = async (req, res) => {
@@ -84,23 +88,6 @@ const update = async (req, res) => {
   res.successResponse(StatusCodes.OK, {
     data: product,
   });
-  // try {
-  //   const results = [];
-  //   fs.createReadStream('../../nike_products.csv')
-  //     .pipe(csv())
-  //     .on('data', (data) => results.push(data))
-  //     .on('end', async () => {
-  //       for (let row of results) {
-  //         const product = new Product(row);
-  //         console.log(product);
-  //         // await product.save();
-  //       }
-  //       res.successResponse(StatusCodes.CREATED);
-  //     });
-  // } catch (error) {
-  //   console.log(error);
-  //   res.errorResponse(StatusCodes.INTERNAL_SERVER_ERROR, error);
-  // }
 };
 
 const remove = async (req, res) => {
@@ -151,31 +138,6 @@ const pineconeCreate = async (req, res) => {
   });
   const pineconeIndex = client.Index(process.env.PINECONE_INDEX);
 
-  // const results = [];
-  // const docs = [];
-  //
-  // fs.createReadStream(
-  //   '/Users/jayingyoung/Desktop/hackathon/backend/controllers/nike_products.csv'
-  // )
-  //   .pipe(csv())
-  //   .on('data', (data) => results.push(data))
-  //   .on('end', () => {
-  //     results.forEach((row) => {
-  //       const document = new Document({
-  //         metadata: {
-  //           name: row['Product Name'],
-  //           productLink: row['Product Link'],
-  //           imageLink: row['Image Link'],
-  //           productPrice: row['Product Price'],
-  //           productDescription: row['Product Description'],
-  //         },
-  //         pageContent: row['Product Description'],
-  //       });
-  //       docs.push(document);
-  //     });
-  //   });
-  // console.log(docs);
-
   parseCSV()
     .then(async (docs) => {
       console.log(docs);
@@ -198,6 +160,36 @@ const pineconeCreate = async (req, res) => {
     });
 };
 
+let chain;
+
+const initModel = async (input) => {
+  if (!chain) {
+    const chat = new ChatOpenAI({ temperature: 0 });
+
+    const chatPrompt = ChatPromptTemplate.fromPromptMessages([
+      SystemMessagePromptTemplate.fromTemplate(
+        'You are a Nike sales representative. \n' +
+          "Given the pre-determined recommended shoe data, present it to the customer, and explain why the shoe fits the customer's query around 5 sentences."
+      ),
+      new MessagesPlaceholder('history'),
+      HumanMessagePromptTemplate.fromTemplate('{input}'),
+    ]);
+
+    chain = new ConversationChain({
+      memory: new BufferMemory({ returnMessages: true, memoryKey: 'history' }),
+      prompt: chatPrompt,
+      llm: chat,
+    });
+  }
+
+  const response = await chain.call({
+    input: input,
+  });
+  console.log('response', response);
+
+  return response;
+};
+
 const pineconeQuery = async (req, res) => {
   const client = new PineconeClient();
   await client.init({
@@ -209,42 +201,23 @@ const pineconeQuery = async (req, res) => {
     new OpenAIEmbeddings(),
     { pineconeIndex }
   );
-  // const vectorStore = await MemoryVectorStore.fromExistingIndex(
-  //   new OpenAIEmbeddings(),
-  //   { pineconeIndex }
-  // );
-
-  /* Search the vector DB independently with meta filters */
-  // const results = await vectorStore.similaritySearch('pinecone', 2, {
-  //   brand: 'nike',
-  // });
-  // console.log(results);
 
   /* Use as part of a chain (currently no metadata filters) */
   const model = new OpenAI();
-  const memory = new BufferMemory();
   const chain = VectorDBQAChain.fromLLM(model, vectorStore, {
     k: 3,
     returnSourceDocuments: true,
   });
   const response = await chain.call({
     query: req.body.input,
-    // 'I want a adidas shoes which is MADE IN PART WITH RECYCLED MATERIALS',
   });
+  const text = await initModel(response.text);
+  response.text = text.response;
+
+  // response.text = text;
   res.successResponse(StatusCodes.OK, {
     data: response,
   });
-  /*
-  {
-	text: ' A pinecone is the woody fruiting body of a pine tree.',
-	sourceDocuments: [
-	  Document {
-		pageContent: 'pinecones are the woody fruiting body and of a pine tree',
-		metadata: [Object]
-	  }
-	]
-  }
-  */
 };
 
 export {
