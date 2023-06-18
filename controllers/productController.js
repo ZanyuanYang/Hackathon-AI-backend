@@ -6,6 +6,13 @@ import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
 import { PineconeStore } from 'langchain/vectorstores/pinecone';
 import { VectorDBQAChain } from 'langchain/chains';
 import { OpenAI } from 'langchain/llms/openai';
+import { SystemMessagePromptTemplate } from 'langchain/prompts';
+import { HumanChatMessage, SystemChatMessage } from 'langchain/schema';
+import readline from 'readline';
+import fs from 'fs';
+import csv from 'csv-parser';
+import { BufferMemory } from 'langchain/memory';
+import { MemoryVectorStore } from 'langchain/vectorstores/memory';
 
 // get one by id
 const getOne = async (req, res) => {
@@ -27,10 +34,46 @@ const getAll = async (req, res) => {
 
 const create = async (req, res) => {
   // create slider
-  const product = new Product(req.body);
-  await product.save();
-  res.successResponse(StatusCodes.CREATED, {
-    data: product,
+  // const product = new Product(req.body);
+  // await product.save();
+  // res.successResponse(StatusCodes.CREATED, {
+  //   data: product,
+  // });
+  // const fileStream = fs.createReadStream(
+  //   '/Users/jayingyoung/Desktop/hackathon/backend/controllers/nike_products.csv'
+  // );
+  //
+  // const rl = readline.createInterface({
+  //   input: fileStream,
+  //   crlfDelay: Infinity,
+  // });
+  //
+  // for await (const line of rl) {
+  //   // Each line in the CSV file will be successively available here as `line`.
+  //   console.log(`Line: ${line}`);
+  // }
+
+  const results = [];
+
+  fs.createReadStream(
+    '/Users/jayingyoung/Desktop/hackathon/backend/controllers/nike_products.csv'
+  )
+    .pipe(csv())
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      results.forEach(async (row) => {
+        const product = new Product({
+          name: row['Product Name'],
+          productLink: row['Product Link'],
+          imageLink: row['Image Link'],
+          productPrice: row['Product Price'],
+          productDescription: row['Product Description'],
+        });
+        await product.save();
+      });
+    });
+  res.successResponse(StatusCodes.OK, {
+    data: 'success',
   });
 };
 
@@ -41,6 +84,23 @@ const update = async (req, res) => {
   res.successResponse(StatusCodes.OK, {
     data: product,
   });
+  // try {
+  //   const results = [];
+  //   fs.createReadStream('../../nike_products.csv')
+  //     .pipe(csv())
+  //     .on('data', (data) => results.push(data))
+  //     .on('end', async () => {
+  //       for (let row of results) {
+  //         const product = new Product(row);
+  //         console.log(product);
+  //         // await product.save();
+  //       }
+  //       res.successResponse(StatusCodes.CREATED);
+  //     });
+  // } catch (error) {
+  //   console.log(error);
+  //   res.errorResponse(StatusCodes.INTERNAL_SERVER_ERROR, error);
+  // }
 };
 
 const remove = async (req, res) => {
@@ -51,6 +111,38 @@ const remove = async (req, res) => {
   });
 };
 
+const parseCSV = () => {
+  return new Promise((resolve, reject) => {
+    const results = [];
+    const docs = [];
+
+    fs.createReadStream(
+      '/Users/jayingyoung/Desktop/hackathon/backend/controllers/nike_products.csv'
+    )
+      .pipe(csv())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        results.forEach((row) => {
+          const document = new Document({
+            metadata: {
+              name: row['Product Name'],
+              productLink: row['Product Link'],
+              imageLink: row['Image Link'],
+              productPrice: row['Product Price'],
+              productDescription: row['Product Description'],
+            },
+            pageContent: row['Product Description'],
+          });
+          docs.push(document);
+        });
+        resolve(docs);
+      })
+      .on('error', (err) => {
+        reject(err);
+      });
+  });
+};
+
 const pineconeCreate = async (req, res) => {
   const client = new PineconeClient();
   await client.init({
@@ -58,67 +150,52 @@ const pineconeCreate = async (req, res) => {
     environment: process.env.PINECONE_ENVIRONMENT,
   });
   const pineconeIndex = client.Index(process.env.PINECONE_INDEX);
-  const docs = [
-    new Document({
-      metadata: {
-        brand: 'nike',
-        name: 'Nike Pegasus 40',
-        description:
-          'A springy ride for every run, the Peg’s familiar, just-for-you feel returns to help you accomplish your goals. This version has the same responsiveness and neutral support you love, but with improved comfort in those sensitive areas of your foot, like the arch and toes. Whether you’re logging long marathon miles, squeezing in a speed session before the sun goes down or hopping into a spontaneous group jaunt, it’s still the established road runner you can put your faith in, day after day, run after run.',
-      },
-      pageContent:
-        'A springy ride for every run, the Peg’s familiar, just-for-you feel returns to help you accomplish your goals. This version has the same responsiveness and neutral support you love, but with improved comfort in those sensitive areas of your foot, like the arch and toes. Whether you’re logging long marathon miles, squeezing in a speed session before the sun goes down or hopping into a spontaneous group jaunt, it’s still the established road runner you can put your faith in, day after day, run after run.',
-    }),
-    new Document({
-      metadata: {
-        brand: 'nike',
-        name: 'Nike Pegasus FlyEase SE',
-        description:
-          'Let the Pegasus FlyEase help you ascend to new heights. Designed to offer a balanced and energized ride for every run, they provide a supportive sensation that helps your foot feel contained. Plus, Nike FlyEase technology acts as a strap, helping secure your fit and making these easy to take on and off. Zoom Air units in the forefoot and heel help add a pop to your stride as you transition from heel to toe. Sharp, bright hues complement dark-room color neutrals, speaking to an inclusive world where digital and physical coexist in harmony.',
-      },
-      pageContent:
-        'Let the Pegasus FlyEase help you ascend to new heights. Designed to offer a balanced and energized ride for every run, they provide a supportive sensation that helps your foot feel contained. Plus, Nike FlyEase technology acts as a strap, helping secure your fit and making these easy to take on and off. Zoom Air units in the forefoot and heel help add a pop to your stride as you transition from heel to toe. Sharp, bright hues complement dark-room color neutrals, speaking to an inclusive world where digital and physical coexist in harmony.',
-    }),
-    new Document({
-      metadata: {
-        brand: 'adidas',
-        name: 'SAMBA OG SHOES',
-        description:
-          'THE CLASSIC LOOK AND FEEL OF THE AUTHENTIC SAMBA.\n' +
-          'Born on the soccer field, the Samba is a timeless icon of street style. These shoes stay true to their legacy with a soft leather upper and suede overlays.',
-      },
-      pageContent:
-        'THE CLASSIC LOOK AND FEEL OF THE AUTHENTIC SAMBA.\n' +
-        'Born on the soccer field, the Samba is a timeless icon of street style. These shoes stay true to their legacy with a soft leather upper and suede overlays.',
-    }),
-    new Document({
-      metadata: {
-        brand: 'adidas',
-        name: 'STAN SMITH SHOES',
-        description:
-          'A SHOE COLLAB WITH ANDRÉ SARAIVA, MADE IN PART WITH RECYCLED MATERIALS.\n' +
-          'adidas teams up once again with artist André Saraiva for a special collection inspired by love. These kids\' adidas shoes have a crisp synthetic leather upper that acts as the canvas for André\'s timeless medium of graffiti. Through this collection, André promotes the mantra "The World Needs Love," encouraging acceptance amongst us all. The "XO" graphic and shoelace charm bring this story to life in the most playful of ways for all of their adventures.\n' +
-          '\n' +
-          'Made with a series of recycled materials, this upper features at least 50% recycled content. This product represents just one of our solutions to help end plastic waste.',
-      },
-      pageContent:
-        'A SHOE COLLAB WITH ANDRÉ SARAIVA, MADE IN PART WITH RECYCLED MATERIALS.\n' +
-        'adidas teams up once again with artist André Saraiva for a special collection inspired by love. These kids\' adidas shoes have a crisp synthetic leather upper that acts as the canvas for André\'s timeless medium of graffiti. Through this collection, André promotes the mantra "The World Needs Love," encouraging acceptance amongst us all. The "XO" graphic and shoelace charm bring this story to life in the most playful of ways for all of their adventures.\n' +
-        '\n' +
-        'Made with a series of recycled materials, this upper features at least 50% recycled content. This product represents just one of our solutions to help end plastic waste.',
-    }),
-  ];
 
-  const response = await PineconeStore.fromDocuments(
-    docs,
-    new OpenAIEmbeddings(),
-    {
-      pineconeIndex,
-    }
-  );
-  res.successResponse(StatusCodes.OK, {
-    data: response,
-  });
+  // const results = [];
+  // const docs = [];
+  //
+  // fs.createReadStream(
+  //   '/Users/jayingyoung/Desktop/hackathon/backend/controllers/nike_products.csv'
+  // )
+  //   .pipe(csv())
+  //   .on('data', (data) => results.push(data))
+  //   .on('end', () => {
+  //     results.forEach((row) => {
+  //       const document = new Document({
+  //         metadata: {
+  //           name: row['Product Name'],
+  //           productLink: row['Product Link'],
+  //           imageLink: row['Image Link'],
+  //           productPrice: row['Product Price'],
+  //           productDescription: row['Product Description'],
+  //         },
+  //         pageContent: row['Product Description'],
+  //       });
+  //       docs.push(document);
+  //     });
+  //   });
+  // console.log(docs);
+
+  parseCSV()
+    .then(async (docs) => {
+      console.log(docs);
+      const response = await PineconeStore.fromDocuments(
+        docs,
+        new OpenAIEmbeddings(),
+        {
+          pineconeIndex,
+        }
+      );
+      res.successResponse(StatusCodes.OK, {
+        data: response,
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      res.successResponse(StatusCodes.OK, {
+        data: 'fail',
+      });
+    });
 };
 
 const pineconeQuery = async (req, res) => {
@@ -132,6 +209,10 @@ const pineconeQuery = async (req, res) => {
     new OpenAIEmbeddings(),
     { pineconeIndex }
   );
+  // const vectorStore = await MemoryVectorStore.fromExistingIndex(
+  //   new OpenAIEmbeddings(),
+  //   { pineconeIndex }
+  // );
 
   /* Search the vector DB independently with meta filters */
   // const results = await vectorStore.similaritySearch('pinecone', 2, {
@@ -141,8 +222,9 @@ const pineconeQuery = async (req, res) => {
 
   /* Use as part of a chain (currently no metadata filters) */
   const model = new OpenAI();
+  const memory = new BufferMemory();
   const chain = VectorDBQAChain.fromLLM(model, vectorStore, {
-    k: 2,
+    k: 3,
     returnSourceDocuments: true,
   });
   const response = await chain.call({
