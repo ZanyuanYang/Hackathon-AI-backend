@@ -196,6 +196,7 @@ const pineconeQuery = async (req, res) => {
     apiKey: process.env.PINECONE_API_KEY,
     environment: process.env.PINECONE_ENVIRONMENT,
   });
+
   const pineconeIndex = client.Index(process.env.PINECONE_INDEX);
   const vectorStore = await PineconeStore.fromExistingIndex(
     new OpenAIEmbeddings(),
@@ -214,10 +215,12 @@ const pineconeQuery = async (req, res) => {
   const text = await initModel(response.text);
   response.text = text.response;
 
-  // response.text = text;
   res.successResponse(StatusCodes.OK, {
     data: response,
   });
+  // res.successResponse(StatusCodes.OK, {
+  //   data: 'ssucees',
+  // });
 };
 
 export {

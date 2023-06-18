@@ -12,8 +12,11 @@ import {
 const router = express.Router();
 
 router.route('/product').get(getAll).post(create);
+
 router.route('/product/:_id').get(getOne).put(update).delete(remove);
 // router.route('/product/pinecone/:user_id').get(pineconeQuery);
 router.route('/product/pinecone').post(pineconeQuery);
+//
 // router.route('/product/pinecone').post(pineconeCreate);
+
 export { router as productRouter };

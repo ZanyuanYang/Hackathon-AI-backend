@@ -8,6 +8,7 @@ const pineconeConfig = async () => {
       environment: process.env.PINECONE_ENVIRONMENT,
       apiKey: process.env.PINECONE_API_KEY,
     });
+
     console.log(colors.bold.cyan('Successfully connected to Pinecone.'));
   } catch (error) {
     console.log(colors.red(error));
