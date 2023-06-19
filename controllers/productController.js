@@ -37,31 +37,18 @@ const getAll = async (req, res) => {
 };
 
 const create = async (req, res) => {
-  // create slider
-  // const product = new Product(req.body);
-  // await product.save();
-  // res.successResponse(StatusCodes.CREATED, {
-  //   data: product,
-  // });
-  // const fileStream = fs.createReadStream(
-  //   '/Users/jayingyoung/Desktop/hackathon/backend/controllers/nike_products.csv'
-  // );
-  //
-  // const rl = readline.createInterface({
-  //   input: fileStream,
-  //   crlfDelay: Infinity,
-  // });
-  //
-  // for await (const line of rl) {
-  //   // Each line in the CSV file will be successively available here as `line`.
-  //   console.log(`Line: ${line}`);
-  // }
+  // create product
+  const product = new Product(req.body);
+  await product.save();
+  res.successResponse(StatusCodes.CREATED, {
+    data: product,
+  });
+};
 
+const mongodbInsert = async (req, res) => {
   const results = [];
 
-  fs.createReadStream(
-    '/Users/jayingyoung/Desktop/hackathon/backend/controllers/nike_products.csv'
-  )
+  fs.createReadStream('./nike_products.csv')
     .pipe(csv())
     .on('data', (data) => results.push(data))
     .on('end', () => {
@@ -103,9 +90,7 @@ const parseCSV = () => {
     const results = [];
     const docs = [];
 
-    fs.createReadStream(
-      '/Users/jayingyoung/Desktop/hackathon/backend/controllers/nike_products.csv'
-    )
+    fs.createReadStream('./nike_products.csv')
       .pipe(csv())
       .on('data', (data) => results.push(data))
       .on('end', () => {
@@ -130,7 +115,7 @@ const parseCSV = () => {
   });
 };
 
-const pineconeCreate = async (req, res) => {
+const pineconeInsert = async (req, res) => {
   const client = new PineconeClient();
   await client.init({
     apiKey: process.env.PINECONE_API_KEY,
@@ -229,6 +214,7 @@ export {
   create,
   update,
   remove,
-  pineconeCreate,
+  pineconeInsert,
+  mongodbInsert,
   pineconeQuery,
 };
